@@ -1,0 +1,29 @@
+# =====================================================================
+# GITIGNORE PARA PROYECTO DE TRADING CUANTITATIVO (EURJPY)
+# =====================================================================
+
+# Entornos virtuales de Python
+.venv/
+venv/
+ENV/
+env/
+
+# Caché y archivos compilados de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Archivos de datos y datasets (Master Features y temporales)
+*.csv
+
+# Modelos entrenados de Deep Learning (Keras y TensorFlow)
+*.keras
+*.h5
+*.model
+
+# Objetos serializados y escaladores guardados (Joblib y Pickle)
+*.pkl
+*.pickle
