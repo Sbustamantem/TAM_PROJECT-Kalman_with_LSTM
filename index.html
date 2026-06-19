@@ -1060,6 +1060,37 @@ banda_inferior     = prediccion_central - (<span class="nm">2</span> * pred_std)
   <div class="paper">
     <h2 class="section-num">VIII. Trading Algorítmico</h2>
     <h2 class="section-title">Motor de Señales por Gradiente y Ruptura de Canal ±2σ</h2>
+    
+    <div class="theory-box" style="margin-bottom: 20px; padding: 15px; background: rgba(33, 150, 243, 0.05); border-left: 4px solid var(--primary); border-radius: 4px;">
+      <h3 style="color: var(--primary); margin-top: 0; font-size: 1.1em; margin-bottom: 10px;">Fundamento Matemático</h3>
+      <p style="margin-bottom: 10px;">El algoritmo de toma de decisiones opera bajo dos principios matemáticos concurrentes para la generación de señales:</p>
+      
+      <ol style="margin-left: 20px; margin-bottom: 15px;">
+        <li style="margin-bottom: 12px;">
+          <strong>Gradiente Predictivo (Giro de Tendencia):</strong> Se calcula la derivada numérica discreta de la predicción central \(\hat{y}_t\) para identificar puntos de inflexión. Sea \(\nabla \hat{y}_t = \hat{y}_t - \hat{y}_{t-1}\). Se filtra el ruido usando un umbral de sensibilidad \(\delta\):
+          <ul style="margin-left: 20px; margin-top: 5px;">
+            <li style="margin-bottom: 4px;"><em>Señal de Compra (Giro Alcista):</em> \(\nabla \hat{y}_{t-1} < -\delta \quad \land \quad \nabla \hat{y}_t > \delta\)</li>
+            <li><em>Señal de Venta (Giro Bajista):</em> \(\nabla \hat{y}_{t-1} > \delta \quad \land \quad \nabla \hat{y}_t < -\delta\)</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Ruptura de Canal Estocástico (Reversión a la Media):</strong> El modelo proyecta un intervalo de confianza gaussiano \(\hat{y}_t \pm 2\hat{\sigma}_t\).
+          <ul style="margin-left: 20px; margin-top: 5px;">
+            <li style="margin-bottom: 4px;"><em>Señal de Compra (Sobreventa):</em> El precio real (\(P_t\)) rompe la banda inferior: \(P_t < \hat{y}_t - 2\hat{\sigma}_t\)</li>
+            <li><em>Señal de Venta (Sobrecompra):</em> El precio real (\(P_t\)) rompe la banda superior: \(P_t > \hat{y}_t + 2\hat{\sigma}_t\)</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h3 style="color: var(--primary); margin-top: 20px; font-size: 1.1em; margin-bottom: 10px;">Lógica de Ejecución del Bot</h3>
+      <p style="margin-bottom: 10px;">
+        El bot itera cronológicamente sobre las predicciones <em>forward</em> (datos ciegos). En cada paso \(t\), evalúa los <em>triggers</em> de gradiente y de canal como un <strong>sistema disyuntivo lógico (OR)</strong>. Si cualquiera de las dos lógicas emite una señal direccional, el bot asume una posición de tamaño fijo.
+      </p>
+      <p style="margin-bottom: 0;">
+        Al operar en temporalidad H1, la operación expira al cierre de la siguiente vela. El resultado se evalúa comparando el precio de entrada (\(P_t\)) con el precio de expiración (\(P_{t+1}\)). Si el precio se movió a favor de la señal, se suma el retorno proporcional al <em>payout</em>; si fue en contra, se deduce el riesgo total asumido en la operación.
+      </p>
+    </div>
+
     <div class="code-wrapper">
       <div class="code-header">
         <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
