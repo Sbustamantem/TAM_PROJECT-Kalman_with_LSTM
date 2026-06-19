@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Filtro de Kalman Híbrido con LSTM Dual-Head — EUR/JPY H1</title>
+  <meta name="description" content="Presentación académica estilo IEEE sobre el sistema de predicción Kalman + LSTM Dual-Head para trading algorítmico en EUR/JPY H1. Autores: Santiago Zambrano, Santiago Bustamante." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Source+Code+Pro:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --ieee-blue:   #003087;
+      --ieee-blue-2: #0056a3;
+      --ieee-red:    #c0392b;
+      --ieee-gold:   #c49a00;
+      --ink:         #111827;
+      --ink-2:       #374151;
+      --ink-3:       #6b7280;
+      --paper:       #fafaf8;
+      --paper-2:     #f3f4f6;
+      --rule:        #d1d5db;
+      --code-bg:     #0f172a;
+      --slide-w:     880px;
+      --radius:      4px;
+      --shadow:      0 2px 16px rgba(0,0,0,.12);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 17px;
+      line-height: 1.7;
+      background: #e8e8e3;
+      color: var(--ink);
+    }
+
+    /* ── NAV ── */
+    #top-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+      background: var(--ieee-blue); color: #fff;
+      display: flex; align-items: center;
+      padding: 0 24px; height: 52px; gap: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.3);
+    }
+    #top-nav .nav-title {
+      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+      flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      letter-spacing: .02em; opacity: .9;
+    }
+    #top-nav .nav-btn {
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+      color: #fff; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+      padding: 5px 14px; border-radius: 3px; cursor: pointer;
+      transition: background .15s; letter-spacing: .04em; text-transform: uppercase;
+    }
+    #top-nav .nav-btn:hover { background: rgba(255,255,255,.28); }
+    #top-nav .nav-btn:disabled { opacity: .35; cursor: default; }
+    #progress-bar {
+      position: fixed; top: 52px; left: 0; height: 3px;
+      background: var(--ieee-gold); transition: width .3s ease; z-index: 998;
+    }
+    #slide-counter {
+      font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+      opacity: .75; min-width: 60px; text-align: center;
+    }
+
+    /* ── LAYOUT ── */
+    #presentation { padding-top: 72px; padding-bottom: 60px; }
+    .slide {
+      display: none; max-width: var(--slide-w);
+      margin: 0 auto; padding: 0 16px;
+      animation: fadeSlide .28s ease both;
+    }
+    .slide.active { display: block; }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── PAPER (watermark via ::before) ── */
+    .paper {
+      background: var(--paper);
+      border: 1px solid #c9c7c0;
+      box-shadow: var(--shadow);
+      padding: 48px 56px;
+      position: relative;
+      overflow: hidden;
+    }
+    .paper::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-20deg);
+      width: 340px; height: 340px;
+      background-image: url('logo-Universidad-Nacional.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.045;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .paper > * { position: relative; z-index: 1; }
+
+    /* ── SLIDE HEADER (no conf-tag) ── */
+    .slide-header {
+      background: var(--ieee-blue); color: #fff;
+      padding: 10px 20px; margin-bottom: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500;
+      letter-spacing: .05em; text-transform: uppercase;
+    }
+    .slide-header .slide-num {
+      background: rgba(255,255,255,.18);
+      padding: 2px 9px; border-radius: 2px;
+      font-weight: 700; font-size: 10px; letter-spacing: .08em;
+    }
+
+    /* ── TYPOGRAPHY ── */
+    h1.title {
+      font-size: 26px; font-weight: 600; line-height: 1.25;
+      color: var(--ieee-blue); margin-bottom: 8px; letter-spacing: -.01em;
+    }
+    h1.title .subtitle {
+      font-weight: 400; font-style: italic; font-size: 18px;
+      color: var(--ink-2); display: block; margin-top: 4px;
+    }
+    h2.section-num {
+      font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--ieee-red); margin-bottom: 4px;
+    }
+    h2.section-title {
+      font-size: 22px; font-weight: 600; color: var(--ieee-blue);
+      margin-bottom: 16px; padding-bottom: 6px;
+      border-bottom: 2px solid var(--ieee-blue);
+    }
+    h3 {
+      font-size: 16px; font-weight: 600; color: var(--ieee-blue-2);
+      margin-top: 22px; margin-bottom: 8px;
+    }
+    p { margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+
+    /* ── AUTHORS ── */
+    .author-block { display: flex; gap: 48px; margin: 20px 0 24px; flex-wrap: wrap; }
+    .author { flex: 1; min-width: 200px; }
+    .author-name { font-weight: 600; font-size: 15px; color: var(--ink); }
+    .author-role { font-size: 13px; color: var(--ink-3); font-style: italic; }
+    .institution-block {
+      border-top: 1px solid var(--rule); padding-top: 14px; margin-top: 14px;
+      display: flex; align-items: center; gap: 20px;
+    }
+    .institution-logo { width: 70px; height: auto; }
+    .institution-info { font-size: 13px; color: var(--ink-2); }
+    .institution-info strong { font-size: 14px; color: var(--ink); }
+
+    /* ── ABSTRACT ── */
+    .abstract-box {
+      border-left: 3px solid var(--ieee-blue); background: var(--paper-2);
+      padding: 14px 20px; margin: 20px 0; font-size: 15px; line-height: 1.65;
+    }
+    .abstract-box .abstract-label {
+      font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--ieee-blue); margin-bottom: 6px;
+    }
+    .keywords { font-size: 14px; margin-top: 14px; }
+    .keywords .kw-label { font-style: italic; font-weight: 600; color: var(--ink-2); }
+    .kw-tag {
+      display: inline-block; background: var(--ieee-blue); color: #fff;
+      font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 2px; margin: 2px; letter-spacing: .03em;
+    }
+
+    /* ── TITLE BAR ── */
+    .title-bar {
+      height: 5px;
+      background: linear-gradient(90deg, var(--ieee-blue), var(--ieee-red));
+      margin-bottom: 28px;
+    }
+
+    /* ── DIVIDER ── */
+    .rule { border: none; border-top: 1px solid var(--rule); margin: 22px 0; }
+
+    /* ── EQUATION ── */
+    .eq-block {
+      background: #f8f7f4; border: 1px solid #e2e0da;
+      border-left: 3px solid var(--ieee-gold);
+      padding: 14px 22px; margin: 16px 0; text-align: center; overflow-x: auto;
+    }
+    .eq-label {
+      font-family: 'Inter', sans-serif; font-size: 11px;
+      color: var(--ink-3); text-align: right; margin-top: 4px;
+    }
+
+    /* ── PARAM TABLE (below equations) ── */
+    .param-table {
+      width: 100%; border-collapse: collapse;
+      font-family: 'Inter', sans-serif; font-size: 12.5px;
+      margin: 8px 0 18px;
+    }
+    .param-table th {
+      background: #1e293b; color: #e2e8f0;
+      padding: 6px 12px; text-align: left;
+      font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    }
+    .param-table td { padding: 6px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.45; }
+    .param-table tr:nth-child(even) td { background: #f1f5f9; }
+    .param-table .sym { font-family: 'Source Code Pro', monospace; color: var(--ieee-blue); font-weight: 600; white-space: nowrap; }
+    .param-table .rng { color: #059669; font-weight: 600; white-space: nowrap; }
+
+    /* ── CODE ── */
+    .code-wrapper { margin: 20px 0; border-radius: var(--radius); overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.25); }
+    .code-header {
+      background: #1e293b; padding: 8px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .code-dots { display: flex; gap: 6px; }
+    .code-dot { width: 11px; height: 11px; border-radius: 50%; }
+    .cd-red   { background: #ff5f56; }
+    .cd-amber { background: #ffbd2e; }
+    .cd-green { background: #27c93f; }
+    .code-filename { font-family: 'Source Code Pro', monospace; font-size: 12px; color: #94a3b8; margin-left: 6px; }
+    pre.code-block {
+      background: var(--code-bg); color: #e2e8f0;
+      font-family: 'Source Code Pro', monospace;
+      font-size: 13px; line-height: 1.65;
+      padding: 18px 22px; overflow-x: auto; tab-size: 4;
+    }
+    pre.code-block .kw  { color: #c4b5fd; font-weight: 600; }
+    pre.code-block .fn  { color: #93c5fd; }
+    pre.code-block .st  { color: #86efac; }
+    pre.code-block .nm  { color: #fdba74; }
+    pre.code-block .cm  { color: #64748b; font-style: italic; }
+    pre.code-block .dc  { color: #fde68a; }
+    pre.code-block .op  { color: #5eead4; }
+
+    /* ── CALLOUT ── */
+    .callout {
+      border: 1px solid; padding: 12px 18px; border-radius: var(--radius);
+      margin: 16px 0; font-size: 14.5px; display: flex; gap: 12px; align-items: flex-start;
+    }
+    .callout.info  { border-color: #93c5fd; background: #eff6ff; }
+    .callout.warn  { border-color: #fcd34d; background: #fffbeb; }
+    .callout.good  { border-color: #86efac; background: #f0fdf4; }
+    .callout .callout-icon { font-size: 18px; line-height: 1.2; }
+    .callout .callout-body { flex: 1; }
+    .callout .callout-body strong {
+      font-family: 'Inter', sans-serif; font-size: 12px;
+      font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    }
+
+    /* ── PIPELINE ── */
+    .pipeline {
+      display: flex; align-items: center;
+      overflow-x: auto; padding: 20px 0; flex-wrap: nowrap; gap: 0;
+    }
+    .pipe-node {
+      flex-shrink: 0; background: var(--ieee-blue); color: #fff;
+      font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
+      text-align: center; padding: 10px 14px; min-width: 100px;
+      line-height: 1.3; border-radius: var(--radius);
+    }
+    .pipe-node.kalman  { background: #1d4ed8; }
+    .pipe-node.decomp  { background: #0e7490; }
+    .pipe-node.feature { background: #7c3aed; }
+    .pipe-node.lstm    { background: #047857; }
+    .pipe-node.output  { background: #b45309; }
+    .pipe-arrow { flex-shrink: 0; width: 30px; text-align: center; color: var(--ink-3); font-size: 18px; }
+
+    /* ── STEP LIST ── */
+    .step-list { list-style: none; counter-reset: steps; }
+    .step-list li {
+      counter-increment: steps; display: flex; gap: 12px;
+      margin-bottom: 14px; align-items: flex-start;
+    }
+    .step-list li::before {
+      content: counter(steps);
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 24px; height: 24px;
+      background: var(--ieee-blue); color: #fff;
+      font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
+      border-radius: 50%; margin-top: 2px;
+    }
+
+    /* ── RESULT TABLE ── */
+    .result-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 18px 0; }
+    .result-table th {
+      background: var(--ieee-blue); color: #fff; padding: 8px 14px;
+      text-align: left; font-family: 'Inter', sans-serif;
+      font-size: 12px; font-weight: 600; letter-spacing: .03em;
+    }
+    .result-table td { padding: 7px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    .result-table tr:nth-child(even) td { background: var(--paper-2); }
+    .result-table .metric { font-weight: 600; color: var(--ieee-blue-2); }
+    .result-table .value-good { color: #15803d; font-weight: 700; }
+    .result-table .value-neutral { color: var(--ink-2); }
+
+    /* ── ARCH TABLE ── */
+    .arch-table { width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 13px; margin: 16px 0; }
+    .arch-table th {
+      background: #1e293b; color: #e2e8f0; padding: 8px 12px;
+      text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    }
+    .arch-table td { padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+    .arch-table tr:nth-child(odd) td { background: #f8f9fa; }
+    .arch-badge {
+      display: inline-block; padding: 1px 7px; border-radius: 2px;
+      font-size: 11px; font-weight: 700; color: #fff;
+    }
+    .ab-lstm  { background: #2563eb; }
+    .ab-drop  { background: #7c3aed; }
+    .ab-dense { background: #059669; }
+    .ab-in    { background: #374151; }
+
+    /* ── METRICS GRID ── */
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 14px; margin: 20px 0; }
+    .metric-card {
+      background: var(--paper-2); border: 1px solid var(--rule);
+      border-top: 3px solid var(--ieee-blue); padding: 16px; text-align: center;
+    }
+    .metric-card .mc-label { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    .metric-card .mc-value { font-size: 26px; font-weight: 700; color: var(--ieee-blue); line-height: 1; }
+    .metric-card .mc-unit { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+    .metric-card.good .mc-value { color: #16a34a; }
+
+    /* ── DECOMP DIAGRAM ── */
+    .decomp-diagram {
+      border: 1px solid var(--rule); border-radius: var(--radius);
+      overflow: hidden; margin: 18px 0;
+    }
+    .decomp-diagram .dd-header {
+      background: #0e7490; color: #fff;
+      font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700;
+      padding: 8px 16px; letter-spacing: .04em; text-transform: uppercase;
+    }
+    .decomp-row {
+      display: grid; grid-template-columns: 120px 1fr;
+      border-bottom: 1px solid var(--rule);
+    }
+    .decomp-row:last-child { border-bottom: none; }
+    .decomp-label {
+      background: #f1f5f9; padding: 10px 14px;
+      font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700;
+      color: var(--ieee-blue-2); border-right: 1px solid var(--rule);
+      display: flex; align-items: center;
+    }
+    .decomp-desc { padding: 10px 16px; font-size: 14px; }
+
+    /* ── REFERENCES ── */
+    .ref-list { list-style: none; font-size: 13.5px; line-height: 1.6; }
+    .ref-list li { display: grid; grid-template-columns: 28px 1fr; gap: 6px; margin-bottom: 10px; color: var(--ink-2); }
+    .ref-list .ref-num { font-family: 'Inter', sans-serif; font-weight: 700; color: var(--ieee-blue); text-align: right; }
+
+    /* ── FOOTER NAV ── */
+    #footer-nav {
+      max-width: var(--slide-w); margin: 0 auto;
+      padding: 16px 16px 0;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .nav-pill {
+      background: var(--ieee-blue); color: #fff; border: none;
+      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+      padding: 9px 22px; cursor: pointer; border-radius: 3px;
+      transition: background .15s; letter-spacing: .03em;
+    }
+    .nav-pill:hover { background: var(--ieee-blue-2); }
+    .nav-pill:disabled { background: var(--ink-3); cursor: default; }
+    #slide-indicator { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--ink-3); font-weight: 500; }
+
+    code {
+      font-family: 'Source Code Pro', monospace;
+      background: #e2e8f0; color: #1e293b;
+      padding: 1px 5px; border-radius: 2px; font-size: .88em;
+    }
+
+    @media (max-width: 640px) {
+      .paper { padding: 28px 22px; }
+      h1.title { font-size: 20px; }
+      h2.section-title { font-size: 18px; }
+      pre.code-block { font-size: 11px; }
+      .decomp-row { grid-template-columns: 90px 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav id="top-nav">
+  <button class="nav-btn" id="btn-prev-top" onclick="changeSlide(-1)">◀ Anterior</button>
+  <span class="nav-title">Filtro de Kalman Híbrido con LSTM Dual-Head — EUR/JPY H1</span>
+  <span id="slide-counter">1 / 11</span>
+  <button class="nav-btn" id="btn-next-top" onclick="changeSlide(1)">Siguiente ▶</button>
+</nav>
+<div id="progress-bar"></div>
+
+<main id="presentation">
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 1 — PORTADA
+══════════════════════════════════════════════════════ -->
+<section class="slide active" id="slide-1">
+  <div class="slide-header">
+    <span>Universidad Nacional de Colombia · Departamento de Ingeniería Eléctrica, Electrónica, y Computación</span>
+    <span class="slide-num">01 / 11</span>
+  </div>
+  <div class="paper">
+    <div class="title-bar"></div>
+    <h1 class="title">
+      Arquitectura Híbrida de Predicción de Series Temporales Financieras:
+      <span class="subtitle">Filtro de Kalman Adaptativo de Fase Cero combinado con Red LSTM Dual-Head para la estimación del par de divisas EUR/JPY en temporalidad H1</span>
+    </h1>
+    <div class="author-block">
+      <div class="author">
+        <div class="author-name">Santiago Alexander Zambrano Chicunque</div>
+        <div class="author-role">Ingeniería Electrónica · UNAL Manizales</div>
+      </div>
+      <div class="author">
+        <div class="author-name">Santiago Bustamante Montoya</div>
+        <div class="author-role">Ingeniería Electrónica · UNAL Manizales</div>
+      </div>
+      <div class="author" style="min-width: 100%;">
+        <div class="author-name" style="color: var(--ieee-blue);">Profesor: Diego Armando Pérez Rosero, PhD.C</div>
+        <div class="author-role">Departamento de Ingeniería Eléctrica, Electrónica, y Computación</div>
+      </div>
+    </div>
+    <div class="institution-block">
+      <img src="logo-Universidad-Nacional.png" alt="Logo UNAL" class="institution-logo" />
+      <div class="institution-info">
+        <strong>Universidad Nacional de Colombia</strong><br/>
+        Sede Manizales · Facultad de Ingeniería y Arquitectura<br/>
+        Junio 2026
+      </div>
+    </div>
+    <hr class="rule" />
+    <div class="abstract-box">
+      <div class="abstract-label">Resumen (Abstract)</div>
+      <p>Este trabajo presenta un sistema de predicción financiera de dos etapas para el par EUR/JPY H1. En la primera etapa, un <strong>Filtro de Kalman Adaptativo Bidireccional (Zero-Lag)</strong> compilado con Numba/JIT elimina el desfase temporal y separa tendencia de residuo microestructural. En la segunda, una <strong>Red LSTM Dual-Head</strong> aprende simultáneamente el residuo y la volatilidad local. La reconstrucción genera además un canal de confianza gaussiano (±2σ). El backtesting sobre semana forward-test obtiene <strong>Win Rate 83.3%</strong> y <strong>retorno neto +31%</strong> sobre $100 USD de capital inicial.</p>
+    </div>
+    <div class="keywords">
+      <span class="kw-label">Index Terms — </span>
+      <span class="kw-tag">Filtro de Kalman</span>
+      <span class="kw-tag">Descomposición Aditiva</span>
+      <span class="kw-tag">Resonancia Temporal</span>
+      <span class="kw-tag">LSTM Dual-Head</span>
+      <span class="kw-tag">EUR/JPY H1</span>
+      <span class="kw-tag">Numba JIT</span>
+      <span class="kw-tag">Residuo Microestructural</span>
+      <span class="kw-tag">Backtesting</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 2 — PIPELINE GENERAL
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-2">
+  <div class="slide-header">
+    <span>I. Introducción — Pipeline General del Sistema</span>
+    <span class="slide-num">02 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">I. Introducción</h2>
+    <h2 class="section-title">Visión General del Sistema</h2>
+    <p>Los mercados de divisas exhiben dinámicas no lineales y no estacionarias. El enfoque propuesto descompone el problema en cuatro etapas encadenadas: adquisición de datos, filtrado y descomposición de la señal, aprendizaje residual con LSTM y generación de señales operativas.</p>
+    <h3>Pipeline de Procesamiento</h3>
+    <div class="pipeline">
+      <div class="pipe-node">📊<br/>Adquisición<br/>H1 yfinance</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node kalman">🔵<br/>Kalman<br/>Zero-Lag JIT</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node decomp">🌊<br/>Descomposición<br/>Aditiva + Ciclos</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node feature">🟣<br/>Feature Eng.<br/>Residuo · StdDev</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node lstm">🟢<br/>LSTM<br/>Dual-Head</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node output">🟠<br/>Predicción<br/>±2σ · Backtesting</div>
+    </div>
+    <hr class="rule" />
+    <h3>Formulación Matemática del Problema</h3>
+    <p>Sea \(y[n]\) el precio de cierre del par EUR/JPY a la hora \(n\). El sistema lo descompone en:</p>
+    <div class="eq-block">
+      \[y[n] = s[n] + r[n] + \varepsilon[n]\]
+      <div class="eq-label">(1)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Nombre</th><th>Dominio / Rango</th><th>Descripción física</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(y[n]\)</td><td>Precio observado</td><td class="rng">\(\mathbb{R}^+\)</td><td>Precio de cierre real del par EUR/JPY en la hora \(n\), con ruido de mercado</td></tr>
+        <tr><td class="sym">\(s[n]\)</td><td>Tendencia suavizada</td><td class="rng">\(\mathbb{R}^+\)</td><td>Componente de tendencia estimada por el Filtro de Kalman Bidireccional Zero-Lag</td></tr>
+        <tr><td class="sym">\(r[n]\)</td><td>Residuo microestructural</td><td class="rng">\(\mathbb{R}\)</td><td>Desviación del precio real respecto a la tendencia; objetivo de aprendizaje de la LSTM</td></tr>
+        <tr><td class="sym">\(\varepsilon[n]\)</td><td>Ruido blanco irreducible</td><td class="rng">\(\mathcal{N}(0,\sigma^2)\)</td><td>Componente estocástica no predecible; su varianza es estimada por el cabezal de volatilidad</td></tr>
+      </tbody>
+    </table>
+    <p>La predicción reconstruida para el horizonte \(n+1\):</p>
+    <div class="eq-block">
+      \[\hat{y}[n+1] = \underbrace{s_{\text{Kalman}}[n+1]}_{\text{tendencia Kalman}} + \underbrace{\hat{r}_{\text{LSTM}}[n+1]}_{\text{residuo predicho por LSTM}}\]
+      <div class="eq-label">(2)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 3 — ADQUISICIÓN DE DATOS
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-3">
+  <div class="slide-header">
+    <span>II. Adquisición y Preparación de Datos</span>
+    <span class="slide-num">03 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">II. Adquisición de Datos</h2>
+    <h2 class="section-title">Módulo <code>data_prep.py</code> — Descarga y Partición Cronológica Estricta</h2>
+    <p>El módulo descarga 12 meses de datos horarios del par EUR/JPY desde Yahoo Finance y aplica una <strong>partición cronológica estricta alineada a lunes</strong>, previniendo cualquier fuga de información (<em>data leakage</em>) hacia el conjunto de prueba.</p>
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div class="callout-body">
+        <strong>Protocolo Anti-Leakage</strong><br/>
+        La división se realiza por semanas completas, nunca por porcentaje aleatorio. La semana en curso se aisla completamente y jamás se expone al entrenamiento ni a los escaladores de normalización.
+      </div>
+    </div>
+    <div class="code-wrapper">
+      <div class="code-header">
+        <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
+        <span class="code-filename">data_prep.py — PASO 2 y 3</span>
+      </div>
+      <pre class="code-block"><span class="cm"># PASO 2 — Descarga de datos crudos H1</span>
+ticker_forex = <span class="st">"EURJPY=X"</span>
+df_raw = yf.<span class="fn">download</span>(ticker_forex, period=<span class="st">"1y"</span>, interval=<span class="st">"1h"</span>)
+df_raw.<span class="fn">reset_index</span>(inplace=<span class="nm">True</span>)
+df_raw.columns = [col.<span class="fn">lower</span>() <span class="kw">for</span> col <span class="kw">in</span> df_raw.columns]
+
+<span class="cm"># PASO 3 — Partición cronológica alineada al lunes</span>
+df_raw[<span class="st">'time'</span>] = pd.<span class="fn">to_datetime</span>(df_raw[<span class="st">'time'</span>]).<span class="fn">dt</span>.<span class="fn">tz_localize</span>(<span class="nm">None</span>)
+ultima_fecha = df_raw[<span class="st">'time'</span>].<span class="fn">max</span>()
+dias_desde_lunes = ultima_fecha.<span class="fn">weekday</span>()          <span class="cm"># 0=Lun … 6=Dom</span>
+lunes_actual = (ultima_fecha - pd.<span class="fn">Timedelta</span>(days=dias_desde_lunes)
+               ).<span class="fn">replace</span>(hour=<span class="nm">0</span>, minute=<span class="nm">0</span>, second=<span class="nm">0</span>)
+
+<span class="cm"># Corte limpio: historial vs. semana actual (NUNCA se mezclan)</span>
+df_historico     = df_raw[df_raw[<span class="st">'time'</span>] &lt; lunes_actual].<span class="fn">copy</span>()
+df_semana_actual = df_raw[df_raw[<span class="st">'time'</span>] &gt;= lunes_actual].<span class="fn">copy</span>()
+
+<span class="cm"># PASO 4 — Exportación de los tres datasets</span>
+df_historico.<span class="fn">to_csv</span>(<span class="st">"EURJPY_H1_Hist_Semanas_Completas.csv"</span>, index=<span class="nm">False</span>)
+df_semana_actual.<span class="fn">to_csv</span>(<span class="st">"EURJPY_H1_Semana_Actual_Prueba.csv"</span>, index=<span class="nm">False</span>)
+df_raw.<span class="fn">to_csv</span>(<span class="st">"EURJPY_D1_ultimo_ano.csv"</span>, index=<span class="nm">False</span>)</pre>
+    </div>
+    <h3>Resultados de la Adquisición</h3>
+    <table class="result-table">
+      <thead><tr><th>Dataset</th><th>Descripción</th><th>Registros</th></tr></thead>
+      <tbody>
+        <tr><td class="metric">Entrenamiento</td><td>Semanas completas, sin data leakage, base del modelo</td><td class="value-good">6,007 velas H1</td></tr>
+        <tr><td class="metric">Forward Test</td><td>Semana actual aislada — nunca vista por el modelo</td><td class="value-neutral">103 velas H1</td></tr>
+        <tr><td class="metric">Total bruto</td><td>12 meses EUR/JPY H1 descargados de Yahoo Finance</td><td class="value-neutral">6,151 velas H1</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 4 — FILTRO DE KALMAN
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-4">
+  <div class="slide-header">
+    <span>III. Filtro de Kalman Adaptativo Bidireccional (Zero-Lag)</span>
+    <span class="slide-num">04 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">III. Filtro de Kalman Adaptativo</h2>
+    <h2 class="section-title">Motor JIT con Ganancia Dinámica — Ecuaciones y Parámetros</h2>
+    <p>El Filtro de Kalman clásico introduce desfase temporal. Para eliminarlo se aplica el filtro <strong>dos veces</strong>: una hacia adelante y otra hacia atrás sobre el resultado (técnica Zero-Lag). La ganancia \(K_t\) se hace adaptativa en función de la volatilidad local usando una sigmoide.</p>
+
+    <h3>Ec. (3) — Cálculo de la Ganancia de Proceso Adaptativa</h3>
+    <div class="eq-block">
+      \[\alpha_t = \sigma_g\!\bigl(-\gamma(\sigma_{\text{vol}}[t] - \bar{\sigma}_{\text{vol}})\bigr), \qquad Q_t = Q_{\text{base}} + \alpha_t\,(Q_{\text{pico}} - Q_{\text{base}})\]
+      <div class="eq-label">(3)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Nombre</th><th>Rango / Unidad</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(\sigma_g(\cdot)\)</td><td>Función sigmoide logística</td><td class="rng">\((0,1)\)</td><td>Mapea cualquier valor real al intervalo abierto (0,1); permite modular suavemente entre \(Q_{\text{base}}\) y \(Q_{\text{pico}}\)</td></tr>
+        <tr><td class="sym">\(\gamma\)</td><td>Sensibilidad adaptativa</td><td class="rng">\([50, 300]\)</td><td>Controla cuán fuertemente la volatilidad local modifica la ganancia de proceso. Valor alto → cambios abruptos; valor bajo → transición suave</td></tr>
+        <tr><td class="sym">\(\sigma_{\text{vol}}[t]\)</td><td>Volatilidad local en \(t\)</td><td class="rng">\(\mathbb{R}^+\) (pip)</td><td>Rango H-L promediado sobre ventana de 5 periodos: proxy de la agitación instantánea del mercado</td></tr>
+        <tr><td class="sym">\(\bar{\sigma}_{\text{vol}}\)</td><td>Volatilidad media global</td><td class="rng">\(\mathbb{R}^+\) (pip)</td><td>Media aritmética de \(\sigma_{\text{vol}}\) sobre todo el dataset; actúa como umbral de referencia para la sigmoide</td></tr>
+        <tr><td class="sym">\(Q_{\text{base}}\)</td><td>Varianza de proceso mínima</td><td class="rng">\([10^{-8}, 10^{-6}]\)</td><td>Nivel de ruido del modelo en mercado quieto; valor pequeño → filtro más suave, más lento ante cambios</td></tr>
+        <tr><td class="sym">\(Q_{\text{pico}}\)</td><td>Varianza de proceso máxima</td><td class="rng">\([10^{-3.5}, 10^{-1.5}]\)</td><td>Nivel de ruido del modelo en mercado volátil; valor alto → filtro más reactivo, sigue el precio más de cerca</td></tr>
+        <tr><td class="sym">\(\alpha_t\)</td><td>Factor de adaptación temporal</td><td class="rng">\((0,1)\)</td><td>Interpola entre los dos regímenes de \(Q\); si \(\alpha_t\approx1\) (alta vol), se usa \(Q_{\text{pico}}\); si \(\alpha_t\approx0\) (baja vol), se usa \(Q_{\text{base}}\)</td></tr>
+        <tr><td class="sym">\(Q_t\)</td><td>Varianza de proceso adaptativa</td><td class="rng">\(\mathbb{R}^+\)</td><td>Resultado final: controla cuánto se permite que el estado interno del filtro cambie en cada paso</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Ec. (4) — Predicción de Covarianza y Ganancia de Kalman</h3>
+    <div class="eq-block">
+      \[P_{\text{pred}} = P + Q_t, \qquad K_t = \frac{P_{\text{pred}}}{P_{\text{pred}} + R}\]
+      <div class="eq-label">(4)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Nombre</th><th>Rango</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(P\)</td><td>Covarianza del error a posteriori</td><td class="rng">\(\mathbb{R}^+\)</td><td>Incertidumbre actual del estimador sobre el estado real; se actualiza en cada iteración</td></tr>
+        <tr><td class="sym">\(P_{\text{pred}}\)</td><td>Covarianza predicha (a priori)</td><td class="rng">\(\mathbb{R}^+\)</td><td>Incertidumbre antes de recibir la nueva observación del mercado; siempre mayor que \(P\)</td></tr>
+        <tr><td class="sym">\(R\)</td><td>Varianza del ruido de medición</td><td class="rng">\([10^{-4.5}, 10^{-3}]\)</td><td>Confianza en la medición del precio (sensor); valor alto → desconfía del precio, más suavizado</td></tr>
+        <tr><td class="sym">\(K_t\)</td><td>Ganancia de Kalman</td><td class="rng">\((0,1)\)</td><td>Peso óptimo que balancea la predicción interna vs. la observación; \(K_t\to1\) = sigue el precio puro; \(K_t\to0\) = ignora el precio nuevo</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Ec. (5) — Actualización del Estado y Covarianza Posterior</h3>
+    <div class="eq-block">
+      \[\hat{x}_t = \hat{x}_{t-1} + K_t\bigl(y_t - \hat{x}_{t-1}\bigr), \qquad P = (1 - K_t)\,P_{\text{pred}}\]
+      <div class="eq-label">(5)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Nombre</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(\hat{x}_t\)</td><td>Estado estimado (precio suavizado)</td><td>Estimación óptima del precio real en el instante \(t\); corresponde a \(s[n]\) en la descomposición general</td></tr>
+        <tr><td class="sym">\(y_t - \hat{x}_{t-1}\)</td><td>Innovación (error de predicción)</td><td>Diferencia entre el precio observado y la predicción anterior; es la señal de corrección que el filtro asimila</td></tr>
+        <tr><td class="sym">\((1-K_t)P_{\text{pred}}\)</td><td>Covarianza posterior</td><td>Incertidumbre residual tras la corrección; tiende a cero si \(K_t\to1\) (confianza total en el precio)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 5 — CÓDIGO KALMAN JIT
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-5">
+  <div class="slide-header">
+    <span>III.B — Implementación: Motor JIT + Fase Cero + Optimización Monte Carlo</span>
+    <span class="slide-num">05 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">III.B — Implementación del Filtro</h2>
+    <h2 class="section-title">Código JIT Numba + Búsqueda Estocástica de Hiperparámetros</h2>
+    <div class="code-wrapper">
+      <div class="code-header">
+        <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
+        <span class="code-filename">test_final.ipynb — PASO 2: Motor JIT y Fase Cero</span>
+      </div>
+      <pre class="code-block"><span class="kw">from</span> numba <span class="kw">import</span> njit
+
+<span class="dc">@njit</span>  <span class="cm"># Compila a código C++ nativo: ×5–×20 más rápido que Python puro</span>
+<span class="kw">def</span> <span class="fn">motor_kalman_jit</span>(precios, volatilidad, media_v,
+                       Q_base, Q_pico, R, gamma):
+    n = <span class="fn">len</span>(precios)
+    estado      = np.<span class="fn">zeros</span>(n)    <span class="cm"># vector de salida: señal suavizada</span>
+    historial_k = np.<span class="fn">zeros</span>(n)    <span class="cm"># historial de ganancia K_t</span>
+    x, P = precios[<span class="nm">0</span>], <span class="nm">1.0</span>       <span class="cm"># estado inicial e incertidumbre inicial</span>
+
+    <span class="kw">for</span> t <span class="kw">in</span> <span class="fn">range</span>(n):
+        <span class="cm"># ── Ganancia adaptativa σ_g clipeada para evitar overflow ──</span>
+        val     = -gamma * (volatilidad[t] - media_v)
+        val     = <span class="fn">max</span>(-<span class="nm">700.0</span>, <span class="fn">min</span>(<span class="nm">700.0</span>, val))  <span class="cm"># clip numérico</span>
+        alpha_t = <span class="nm">1.0</span> / (<span class="nm">1.0</span> + np.<span class="fn">exp</span>(val))          <span class="cm"># sigmoide</span>
+        Q_t     = Q_base + alpha_t * (Q_pico - Q_base)  <span class="cm"># interpolación</span>
+        <span class="cm"># ── Ecuaciones estándar de Kalman ──</span>
+        P_pred       = P + Q_t
+        K_t          = P_pred / (P_pred + R)             <span class="cm"># ganancia óptima</span>
+        historial_k[t] = K_t
+        x            = x + K_t * (precios[t] - x)       <span class="cm"># corrección</span>
+        P            = (<span class="nm">1.0</span> - K_t) * P_pred            <span class="cm"># covarianza post.</span>
+        estado[t]    = x
+    <span class="kw">return</span> estado, historial_k
+
+<span class="kw">def</span> <span class="fn">aplicar_fase_cero</span>(precios, volatilidad, media_v,
+                        qb_l, qp_l, r_l, gamma):
+    qb, qp, r = <span class="nm">10.0</span>**qb_l, <span class="nm">10.0</span>**qp_l, <span class="nm">10.0</span>**r_l
+    e_fwd, k_fwd = <span class="fn">motor_kalman_jit</span>(precios, ...)        <span class="cm"># Pasada →</span>
+    e_bwd, _     = <span class="fn">motor_kalman_jit</span>(e_fwd[::-<span class="nm">1</span>], ...)   <span class="cm"># Pasada ← (invierte)</span>
+    <span class="kw">return</span> e_bwd[::-<span class="nm">1</span>], k_fwd                          <span class="cm"># re-invierte → LAG=0</span>
+
+<span class="cm"># ── Optimización Monte Carlo (5 000 iteraciones) ───────────────</span>
+OBJETIVO_COSTO = <span class="nm">0.0000009</span> * ((precio_medio / <span class="nm">1.08</span>) ** <span class="nm">2</span>)
+mejor_costo    = <span class="fn">float</span>(<span class="st">'inf'</span>)
+
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="nm">5000</span>):
+    qb  = np.random.<span class="fn">uniform</span>(-<span class="nm">8.0</span>, -<span class="nm">6.0</span>)   <span class="cm"># log₁₀(Q_base)</span>
+    qp  = np.random.<span class="fn">uniform</span>(-<span class="nm">3.5</span>, -<span class="nm">1.5</span>)   <span class="cm"># log₁₀(Q_pico)</span>
+    rl  = np.random.<span class="fn">uniform</span>(-<span class="nm">4.5</span>, -<span class="nm">3.0</span>)   <span class="cm"># log₁₀(R)</span>
+    gam = np.random.<span class="fn">uniform</span>( <span class="nm">50.0</span>, <span class="nm">300.0</span>)  <span class="cm"># gamma (sensibilidad)</span>
+    <span class="kw">if</span> qb >= qp: <span class="kw">continue</span>  <span class="cm"># restricción: Q_base &lt; Q_pico</span>
+    <span class="cm"># Función de costo: MSE + penalización de curvatura (0.05)</span>
+    costo = np.<span class="fn">mean</span>((precios - senal)**<span class="nm">2</span>) + np.<span class="fn">mean</span>(np.<span class="fn">diff</span>(senal,n=<span class="nm">2</span>)**<span class="nm">2</span>)*<span class="nm">0.05</span>
+    <span class="kw">if</span> costo &lt; mejor_costo:
+        mejor_costo = costo; mejores_params = [qb, qp, rl, gam]</pre>
+    </div>
+    <h3>Ec. (6) — Función de Costo de la Optimización</h3>
+    <div class="eq-block">
+      \[\mathcal{C} = \underbrace{\frac{1}{N}\sum_{t}(y[t]-\hat{x}[t])^2}_{\text{MSE fidelidad al precio}} + 0.05\cdot\underbrace{\frac{1}{N}\sum_{t}\!\left(\Delta^2\hat{x}[t]\right)^2}_{\text{penalización de curvatura}}\]
+      <div class="eq-label">(6)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Nombre</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(\mathcal{C}\)</td><td>Función de costo total</td><td>Criterio a minimizar en la búsqueda Monte Carlo; combina dos objetivos en competencia</td></tr>
+        <tr><td class="sym">\(\frac{1}{N}\sum(y-\hat{x})^2\)</td><td>MSE de fidelidad</td><td>Error cuadrático medio entre el precio real y la señal suavizada; mide cuánto se aleja el filtro del precio</td></tr>
+        <tr><td class="sym">\(\Delta^2\hat{x}[t]\)</td><td>Segunda diferencia (curvatura)</td><td>Aproximación discreta de la segunda derivada de la señal; mide la rugosidad u oscilación de la curva suavizada</td></tr>
+        <tr><td class="sym">\(0.05\)</td><td>Peso de penalización</td><td>Factor que equilibra fidelidad vs. suavidad; valor calibrado empíricamente para evitar señales serradas</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 6 — DESCOMPOSICIÓN ADITIVA DE SEÑAL
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-6">
+  <div class="slide-header">
+    <span>IV. Descomposición Aditiva de la Serie Temporal</span>
+    <span class="slide-num">06 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">IV. Descomposición de la Señal</h2>
+    <h2 class="section-title">Modelo Aditivo Estacional — EUR/JPY H1 (periodo = 24 h)</h2>
+    <p>
+      Antes de entrenar la LSTM se realiza una <strong>descomposición aditiva clásica</strong> de la serie temporal usando
+      <code>seasonal_decompose</code> de <em>statsmodels</em> con periodo 24 (un ciclo diario). Esto permite auditar
+      visualmente que la señal contiene los tres componentes esperados y justifica la elección de la ventana temporal
+      \(T=24\) horas para la red neuronal.
+    </p>
+
+    <h3>Modelo Matemático de la Descomposición Aditiva</h3>
+    <div class="eq-block">
+      \[y[n] = T[n] + S[n] + R[n]\]
+      <div class="eq-label">(7)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Componente</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(T[n]\)</td><td>Tendencia (<em>Trend</em>)</td><td>Variación de largo plazo del precio; captura el drift direccional del mercado a lo largo de semanas/meses. Estimada mediante media móvil centrada de ventana 24</td></tr>
+        <tr><td class="sym">\(S[n]\)</td><td>Estacionalidad (<em>Seasonal</em>)</td><td>Patrón periódico de periodo fijo (24 horas); refleja el comportamiento repetitivo de las sesiones bursátiles (Asia, Europa, NY). Su amplitud es constante en el modelo aditivo</td></tr>
+        <tr><td class="sym">\(R[n]\)</td><td>Residuo (<em>Residual</em>)</td><td>Lo que no explican tendencia ni estacionalidad; contiene la microestructura y el ruido estocástico. Este es el componente que la LSTM aprende a predecir</td></tr>
+      </tbody>
+    </table>
+
+    <div class="code-wrapper">
+      <div class="code-header">
+        <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
+        <span class="code-filename">test_final.ipynb — PASO 4: Descomposición Aditiva</span>
+      </div>
+      <pre class="code-block"><span class="kw">from</span> statsmodels.tsa.seasonal <span class="kw">import</span> seasonal_decompose
+
+<span class="cm"># 1. Cargamos el Master Dataset y fijamos el tiempo como índice</span>
+df_features = pd.<span class="fn">read_csv</span>(<span class="st">'EURJPY_H1_Master_Features.csv'</span>)
+df_features[<span class="st">'time'</span>] = pd.<span class="fn">to_datetime</span>(df_features[<span class="st">'time'</span>])
+df_temp = df_features.<span class="fn">set_index</span>(<span class="st">'time'</span>)
+
+<span class="cm"># 2. Descomposición aditiva — periodo=24 (ciclo diario en H1)</span>
+<span class="cm">#    model='additive': T + S + R  (vs. 'multiplicative': T × S × R)</span>
+<span class="cm">#    period=24: asume que la estacionalidad se repite cada 24 horas</span>
+resultado = <span class="fn">seasonal_decompose</span>(df_temp[<span class="st">'close'</span>],
+                                 model=<span class="st">'additive'</span>,
+                                 period=<span class="nm">24</span>)
+
+<span class="cm"># Componentes disponibles:</span>
+<span class="cm">#   resultado.trend    → T[n]: media móvil centrada</span>
+<span class="cm">#   resultado.seasonal → S[n]: patrón de 24 h repetido</span>
+<span class="cm">#   resultado.resid    → R[n]: microestructura + ruido</span>
+
+fig = resultado.<span class="fn">plot</span>()
+plt.<span class="fn">tight_layout</span>(); plt.<span class="fn">show</span>()</pre>
+    </div>
+
+    <div class="figure-wrap" style="text-align:center; margin:20px 0;">
+      <img src="graficos/grafica_01_descomposicion.png" alt="Gráfica de Descomposición Aditiva" style="max-width:100%; border:1px solid var(--rule); box-shadow:0 2px 8px rgba(0,0,0,.1);" />
+      <p style="font-size:13px; font-style:italic; color:var(--ink-3); margin-top:6px;"><strong>Fase 1 (Descomposición):</strong> Validación visual del mercado EUR/JPY. Se observa la tendencia pura, el ciclo estacional de sesiones bursátiles (24h) y el ruido residual estocástico que la LSTM deberá aprender a pronosticar.</p>
+    </div>
+
+    <div class="decomp-diagram">
+      <div class="dd-header">Estructura de los cuatro paneles del gráfico de descomposición</div>
+      <div class="decomp-row">
+        <div class="decomp-label">Panel 1<br/>Precio Real</div>
+        <div class="decomp-desc"><strong>\(y[n]\)</strong> — Serie original de precios de cierre EUR/JPY H1. Exhibe deriva alcista/bajista entremezclada con oscilaciones de alta frecuencia.</div>
+      </div>
+      <div class="decomp-row">
+        <div class="decomp-label">Panel 2<br/>Tendencia</div>
+        <div class="decomp-desc"><strong>\(T[n]\)</strong> — Media móvil centrada de ventana 24. Captura el movimiento de fondo del mercado; equivalente al Kalman suavizado pero lineal. Los extremos tienen NaN (sin datos suficientes para centrar).</div>
+      </div>
+      <div class="decomp-row">
+        <div class="decomp-label">Panel 3<br/>Estacionalidad</div>
+        <div class="decomp-desc"><strong>\(S[n]\)</strong> — Patrón cíclico de 24 h que se repite idéntico cada día. Refleja la variación sistemática intradiaria: apertura/cierre de sesiones. La LSTM lo aprende implícitamente mediante la ventana de 24 pasos.</div>
+      </div>
+      <div class="decomp-row">
+        <div class="decomp-label">Panel 4<br/>Residuo</div>
+        <div class="decomp-desc"><strong>\(R[n]\)</strong> — Lo que queda tras restar tendencia y estacionalidad. Contiene la microestructura del mercado (órdenes institucionales, noticias) y ruido blanco. <strong>Es el objetivo de aprendizaje de la LSTM.</strong></div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <span class="callout-icon">💡</span>
+      <div class="callout-body">
+        <strong>Justificación de T = 24</strong><br/>
+        La descomposición confirma que el ciclo estacional dominante es de 24 horas, lo que justifica matemáticamente usar una ventana de entrada de \(T=24\) pasos temporales en la LSTM.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 7 — EXPLORADOR DE RESONANCIA TEMPORAL
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-7">
+  <div class="slide-header">
+    <span>V. Explorador de Resonancia Temporal — Buscador de Ciclos del Mercado</span>
+    <span class="slide-num">07 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">V. Resonancia Temporal</h2>
+    <h2 class="section-title">Herramienta Interactiva para Identificar la Periodicidad Natural del Mercado</h2>
+    <p>
+      Antes de fijar la ventana \(T\) de la LSTM, se utiliza un <strong>Explorador de Resonancia Temporal</strong>:
+      un dashboard Plotly con slider que divide la señal en \(n\) particiones equidistantes y traza líneas
+      rojas verticales sincronizadas entre el precio Kalman y la volatilidad dinámica.
+      Cuando las particiones <em>coinciden visualmente</em> con los máximos/mínimos de volatilidad, se ha
+      identificado la <strong>frecuencia natural de oscilación</strong> del mercado.
+    </p>
+
+    <h3>Concepto: ¿Qué es la Resonancia Temporal?</h3>
+    <div class="callout info">
+      <span class="callout-icon">🎯</span>
+      <div class="callout-body">
+        <strong>Analogía física</strong><br/>
+        Al igual que en física un sistema resonante responde máximamente a su frecuencia natural, el mercado
+        exhibe patrones de volatilidad que se repiten a intervalos regulares (sesiones bursátiles).
+        Encontrar esa frecuencia permite configurar \(T\) como el "período de muestreo" óptimo para la LSTM.
+      </div>
+    </div>
+
+    <div class="code-wrapper">
+      <div class="code-header">
+        <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
+        <span class="code-filename">test_final.ipynb — PASO 5: Explorador de Resonancia</span>
+      </div>
+      <pre class="code-block"><span class="cm"># Panel 1: Precio purificado por Kalman Zero-Lag</span>
+fig.<span class="fn">add_trace</span>(go.<span class="fn">Scatter</span>(x=indices, y=df_completo[<span class="st">'Kalman_ZeroLag'</span>],
+    mode=<span class="st">'lines'</span>, name=<span class="st">'Señal Limpia'</span>, line=<span class="fn">dict</span>(color=<span class="st">'#003366'</span>, width=<span class="nm">2</span>)))
+
+<span class="cm"># Panel 2: Volatilidad Dinámica (retornos log rolling std-12)</span>
+fig.<span class="fn">add_trace</span>(go.<span class="fn">Scatter</span>(x=indices, y=df_completo[<span class="st">'Volatilidad_Hibrida'</span>],
+    fill=<span class="st">'tozeroy'</span>, fillcolor=<span class="st">'rgba(142,68,173,0.2)'</span>, name=<span class="st">'Volatilidad'</span>))
+
+<span class="cm"># ── Motor del Slider: genera particiones de 2 a 32 ciclos ─────</span>
+<span class="kw">for</span> particiones <span class="kw">in</span> <span class="fn">range</span>(<span class="nm">2</span>, <span class="nm">33</span>):
+    <span class="cm"># Cortes equidistantes sobre el eje temporal completo</span>
+    cortes = np.<span class="fn">linspace</span>(<span class="nm">0</span>, n_total, particiones + <span class="nm">1</span>)
+    formas = []
+    <span class="kw">for</span> corte <span class="kw">in</span> cortes:
+        formas.<span class="fn">append</span>(<span class="fn">dict</span>(
+            type=<span class="st">"line"</span>,
+            xref=<span class="st">"x"</span>,     yref=<span class="st">"paper"</span>,    <span class="cm"># cruza AMBOS paneles</span>
+            x0=corte,    x1=corte,
+            y0=<span class="nm">0</span>,        y1=<span class="nm">1</span>,
+            line=<span class="fn">dict</span>(color=<span class="st">"red"</span>, width=<span class="nm">1.5</span>, dash=<span class="st">"dot"</span>)
+        ))
+    pasos_slider.<span class="fn">append</span>(<span class="fn">dict</span>(
+        method=<span class="st">"relayout"</span>,
+        args=[<span class="st">"shapes"</span>, formas],
+        label=<span class="fn">str</span>(particiones)      <span class="cm"># etiqueta visible del slider</span>
+    ))</pre>
+    </div>
+
+    <div class="figure-wrap" style="text-align:center; margin:20px 0;">
+      <img src="graficos/grafica_02_resonancia.png" alt="Gráfica de Resonancia Temporal" style="max-width:100%; border:1px solid var(--rule); box-shadow:0 2px 8px rgba(0,0,0,.1);" />
+      <p style="font-size:13px; font-style:italic; color:var(--ink-3); margin-top:6px;"><strong>Fase 2 (Exploración de Frecuencia):</strong> Sincronización entre la señal de precio y su volatilidad dinámica. Las líneas verticales confirman matemáticamente que usar T=24 horas (un ciclo) captura los máximos y mínimos de la agitación del mercado.</p>
+    </div>
+
+    <h3>Parámetros clave del Explorador</h3>
+    <table class="param-table">
+      <thead><tr><th>Parámetro</th><th>Valor / Rango</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">Particiones del slider</td><td class="rng">2 a 32 ciclos</td><td>Número de segmentos en que se divide el historial completo; el usuario mueve el slider hasta ver alineación visual entre cortes y picos de volatilidad</td></tr>
+        <tr><td class="sym"><code>Volatilidad_Hibrida</code></td><td class="rng">\(\mathbb{R}^+\)</td><td>Desviación estándar rolling de los retornos logarítmicos de la señal Kalman sobre ventana 12; mide la agitación local de la tendencia limpia</td></tr>
+        <tr><td class="sym"><code>yref="paper"</code></td><td class="rng">—</td><td>Parámetro Plotly que hace que las líneas rojas crucen verticalmente ambos paneles de forma sincronizada, facilitando la lectura del ciclo</td></tr>
+        <tr><td class="sym">Resultado: \(T = 24\)</td><td class="rng">24 horas</td><td>Valor confirmado por el explorador como la ventana de tiempo óptima que captura un ciclo completo de apertura/cierre de las sesiones bursátiles</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 8 — FEATURE ENGINEERING
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-8">
+  <div class="slide-header">
+    <span>VI. Feature Engineering — Master Dataset</span>
+    <span class="slide-num">08 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">VI. Ingeniería de Características</h2>
+    <h2 class="section-title">Cálculo de Atributos y Construcción del Master Dataset</h2>
+    <div class="code-wrapper">
+      <div class="code-header">
+        <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
+        <span class="code-filename">test_final.ipynb — PASO 3: Feature Engineering</span>
+      </div>
+      <pre class="code-block"><span class="cm"># Aplicar filtro campeón con parámetros óptimos hallados</span>
+senal_k_cero, historial_k = <span class="fn">aplicar_fase_cero</span>(
+    precios_real_jit, volatilidad_jit, media_v, *mejores_params)
+
+df_completo[<span class="st">'Kalman_ZeroLag'</span>] = senal_k_cero    <span class="cm"># s[n] — tendencia</span>
+df_completo[<span class="st">'Kalman_Gain'</span>]    = historial_k    <span class="cm"># K_t — reactividad</span>
+
+<span class="cm"># Feature 1: Desviación Estándar rolling-14 (proxy de riesgo)</span>
+df_completo[<span class="st">'StdDev'</span>] = (df_completo[<span class="st">'close'</span>]
+    .<span class="fn">rolling</span>(window=<span class="nm">14</span>, min_periods=<span class="nm">2</span>).<span class="fn">std</span>()
+    .<span class="fn">bfill</span>().<span class="fn">fillna</span>(<span class="nm">0</span>))
+
+<span class="cm"># Feature 2: Residual de Microestructura — objetivo de la LSTM</span>
+df_completo[<span class="st">'Residual_Micro'</span>] = (
+    df_completo[<span class="st">'close'</span>] - df_completo[<span class="st">'Kalman_ZeroLag'</span>])
+
+<span class="cm"># Feature 3: Retornos logarítmicos de la señal limpia</span>
+df_completo[<span class="st">'Retornos_Hibridos'</span>] = np.<span class="fn">log</span>(
+    df_completo[<span class="st">'Kalman_ZeroLag'</span>] /
+    df_completo[<span class="st">'Kalman_ZeroLag'</span>].<span class="fn">shift</span>(<span class="nm">1</span>)).<span class="fn">fillna</span>(<span class="nm">0</span>)
+
+<span class="cm"># Feature 4: Volatilidad Híbrida — búsqueda de resonancia</span>
+df_completo[<span class="st">'Volatilidad_Hibrida'</span>] = (
+    df_completo[<span class="st">'Retornos_Hibridos'</span>]
+    .<span class="fn">rolling</span>(window=<span class="nm">12</span>, min_periods=<span class="nm">2</span>).<span class="fn">std</span>().<span class="fn">bfill</span>())</pre>
+    </div>
+    <h3>Tensor de Entrada para la LSTM</h3>
+    <div class="eq-block">
+      \[\mathbf{X}[n] = \begin{bmatrix}
+        s_{\text{norm}}[n-23] & \sigma_{\text{norm}}[n-23] \\
+        \vdots & \vdots \\
+        s_{\text{norm}}[n] & \sigma_{\text{norm}}[n]
+      \end{bmatrix} \in \mathbb{R}^{24 \times 2}\]
+      <div class="eq-label">(8)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Columna</th><th>Derivada de</th><th>Normalización</th><th>Rol en la LSTM</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(f_1\) = Kalman_ZeroLag</td><td>Señal suavizada bidireccional \(s[n]\)</td><td class="rng">Z-Score (StandardScaler)</td><td>Provee información de tendencia al codificador recurrente</td></tr>
+        <tr><td class="sym">\(f_2\) = StdDev rolling-14</td><td>\(\text{std}_{14}(\text{close})\) en pip</td><td class="rng">Z-Score (StandardScaler)</td><td>Informa al modelo sobre el régimen de volatilidad; guía la predicción del cabezal de riesgo</td></tr>
+        <tr><td class="sym">Target 1: Residual_Micro</td><td>\(\text{close} - \text{Kalman\_ZeroLag}\)</td><td class="rng">Z-Score (StandardScaler)</td><td>Variable objetivo del cabezal lineal: diferencia entre precio real y tendencia</td></tr>
+        <tr><td class="sym">Target 2: StdDev</td><td>Misma que \(f_2\)</td><td class="rng">MinMax [0,1]</td><td>Variable objetivo del cabezal ReLU: volatilidad estadística para construir el canal ±2σ</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 9 — LSTM DUAL-HEAD
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-9">
+  <div class="slide-header">
+    <span>VII. Red LSTM Dual-Head — Arquitectura y Entrenamiento</span>
+    <span class="slide-num">09 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">VII. Red Neuronal Recurrente</h2>
+    <h2 class="section-title">LSTM Dual-Head: Código de Producción y Ecuaciones de la Celda</h2>
+    <div class="code-wrapper">
+      <div class="code-header">
+        <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
+        <span class="code-filename">test_final.ipynb — PASO 3 AI: Pipeline de Producción LSTM</span>
+      </div>
+      <pre class="code-block"><span class="cm"># ── Arquitectura LSTM Dual-Head ──────────────────────────────</span>
+T = <span class="nm">24</span>                                      <span class="cm"># ventana temporal (ciclo diario)</span>
+entrada_f = <span class="fn">Input</span>(shape=(T, <span class="nm">2</span>))             <span class="cm"># (Batch, 24, 2)</span>
+x_f = <span class="fn">LSTM</span>(<span class="nm">64</span>, return_sequences=<span class="nm">True</span>,
+           activation=<span class="st">'tanh'</span>)(entrada_f)    <span class="cm"># LSTM 1 → (Batch, 24, 64)</span>
+x_f = <span class="fn">Dropout</span>(<span class="nm">0.2</span>)(x_f)                    <span class="cm"># Regularización 20%</span>
+x_f = <span class="fn">LSTM</span>(<span class="nm">32</span>, activation=<span class="st">'tanh'</span>)(x_f)      <span class="cm"># LSTM 2 → (Batch, 32)</span>
+x_f = <span class="fn">Dropout</span>(<span class="nm">0.2</span>)(x_f)
+x_f = <span class="fn">Dense</span>(<span class="nm">32</span>, activation=<span class="st">'tanh'</span>)(x_f)    <span class="cm"># Capa latente compartida</span>
+
+<span class="cm"># Cabezal 1: Residuo microestructural (activación lineal)</span>
+res_f = <span class="fn">Dense</span>(<span class="nm">1</span>, name=<span class="st">'Res'</span>)(x_f)
+
+<span class="cm"># Cabezal 2: Volatilidad (ReLU garantiza σ̂ ≥ 0)</span>
+std_f = <span class="fn">Dense</span>(<span class="nm">1</span>, activation=<span class="st">'relu'</span>, name=<span class="st">'Std'</span>)(x_f)
+
+<span class="cm"># ── Compilación con Loss Multitarea ──────────────────────────</span>
+model = <span class="fn">Model</span>(inputs=entrada_f, outputs=[res_f, std_f])
+model.<span class="fn">compile</span>(optimizer=<span class="fn">Adam</span>(<span class="nm">0.001</span>),
+              loss={<span class="st">'Res'</span>: <span class="st">'mse'</span>, <span class="st">'Std'</span>: <span class="st">'mse'</span>},
+              loss_weights={<span class="st">'Res'</span>: <span class="nm">1.0</span>, <span class="st">'Std'</span>: <span class="nm">0.3</span>})
+<span class="fn">EarlyStopping</span>(monitor=<span class="st">'val_loss'</span>, patience=<span class="nm">12</span>, restore_best_weights=<span class="nm">True</span>)
+
+<span class="cm"># ── Reconstrucción de la predicción final ────────────────────</span>
+prediccion_central = k_base + scaler_y_res.<span class="fn">inverse_transform</span>(p_res).<span class="fn">flatten</span>()
+pred_std           = scaler_y_std.<span class="fn">inverse_transform</span>(p_std).<span class="fn">flatten</span>()
+banda_superior     = prediccion_central + (<span class="nm">2</span> * pred_std)   <span class="cm"># +2σ</span>
+banda_inferior     = prediccion_central - (<span class="nm">2</span> * pred_std)   <span class="cm"># -2σ</span></pre>
+    </div>
+
+    <h3>Loss Multitarea y Ecuaciones de las Compuertas LSTM</h3>
+    <div class="eq-block">
+      \[\mathcal{L}_{\text{total}} = \underbrace{\frac{1}{B}\sum_i(r_i-\hat{r}_i)^2}_{\mathcal{L}_{\text{residuo}}} + 0.3\cdot\underbrace{\frac{1}{B}\sum_i(\sigma_i-\hat{\sigma}_i)^2}_{\mathcal{L}_{\text{volatilidad}}}\]
+      <div class="eq-label">(9)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Nombre</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(r_i\)</td><td>Residuo real normalizado</td><td>Valor objetivo del cabezal 1; diferencia real entre precio y Kalman, escalada por StandardScaler</td></tr>
+        <tr><td class="sym">\(\hat{r}_i\)</td><td>Residuo predicho</td><td>Salida del cabezal lineal; reconstruye el componente microestructural del precio</td></tr>
+        <tr><td class="sym">\(\sigma_i\)</td><td>Volatilidad real normalizada</td><td>StdDev rolling-14 escalada por MinMaxScaler; siempre en [0,1]</td></tr>
+        <tr><td class="sym">\(\hat{\sigma}_i\)</td><td>Volatilidad predicha</td><td>Salida del cabezal ReLU; garantiza positividad física (\(\hat{\sigma}\geq0\))</td></tr>
+        <tr><td class="sym">\(0.3\)</td><td>Peso de volatilidad (\(w\))</td><td>Evita que los gradientes ruidosos de la volatilidad desestabilicen el aprendizaje del residuo central</td></tr>
+        <tr><td class="sym">\(B = 32\)</td><td>Batch size</td><td>Número de muestras por paso de gradiente; equilibra velocidad de convergencia y estabilidad numérica</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Compuertas de la Celda LSTM</h3>
+    <div class="eq-block">
+      \[c[k] = \underbrace{f[k]}_{\text{olvido}}\odot c[k-1] + \underbrace{i[k]}_{\text{entrada}}\odot\tilde{c}[k], \qquad h[k] = \underbrace{o[k]}_{\text{salida}}\odot\tanh(c[k])\]
+      <div class="eq-label">(10)</div>
+    </div>
+    <table class="param-table">
+      <thead><tr><th>Símbolo</th><th>Compuerta</th><th>Rango</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">\(f[k]\)</td><td>Olvido (<em>forget gate</em>)</td><td class="rng">\((0,1)\)</td><td>Controla qué fracción de la memoria a largo plazo \(c[k-1]\) se retiene; \(f\approx1\) = memoria perfecta, \(f\approx0\) = olvido total</td></tr>
+        <tr><td class="sym">\(i[k]\)</td><td>Entrada (<em>input gate</em>)</td><td class="rng">\((0,1)\)</td><td>Controla cuánta información nueva del candidato \(\tilde{c}[k]\) se escribe en la memoria; regula el acoplamiento de la nueva observación</td></tr>
+        <tr><td class="sym">\(\tilde{c}[k]\)</td><td>Estado candidato</td><td class="rng">\((-1,1)\)</td><td>Versión propuesta de nueva información, calculada con \(\tanh\); representa la señal de entrada amplificada y saturada</td></tr>
+        <tr><td class="sym">\(c[k]\)</td><td>Estado de celda (memoria)</td><td class="rng">\(\mathbb{R}\)</td><td>Acumulador de memoria a largo plazo; su ecuación lineal en diferencias permite al gradiente fluir hacia el pasado sin desvanecerse</td></tr>
+        <tr><td class="sym">\(o[k]\)</td><td>Salida (<em>output gate</em>)</td><td class="rng">\((0,1)\)</td><td>Decide qué parte del estado de celda saturado \(\tanh(c[k])\) se expone como hidden state a las capas superiores</td></tr>
+        <tr><td class="sym">\(h[k]\)</td><td>Hidden state</td><td class="rng">\((-1,1)\)</td><td>Salida de la celda en el paso \(k\); sirve como entrada a la siguiente capa LSTM y como contexto para el siguiente paso temporal</td></tr>
+        <tr><td class="sym">\(\odot\)</td><td>Producto Hadamard</td><td class="rng">—</td><td>Multiplicación elemento a elemento; permite que cada unidad de memoria tenga su propia compuerta independiente</td></tr>
+      </tbody>
+    </table>
+
+    <div class="figure-wrap" style="text-align:center; margin:20px 0;">
+      <img src="graficos/grafica_03_auditoria_lstm.png" alt="Auditoría de Aprendizaje LSTM" style="max-width:100%; border:1px solid var(--rule); box-shadow:0 2px 8px rgba(0,0,0,.1);" />
+      <p style="font-size:13px; font-style:italic; color:var(--ink-3); margin-top:6px;"><strong>Fase 3 (Auditoría del Aprendizaje):</strong> Desempeño del conjunto de entrenamiento/prueba. La predicción de la LSTM (rojo en panel 3) mapea casi a la perfección el residuo estocástico real (negro), comprobando la solidez de la red Dual-Head.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 10 — BACKTESTING
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-10">
+  <div class="slide-header">
+    <span>VIII. Sistema de Trading y Backtesting Operativo</span>
+    <span class="slide-num">10 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">VIII. Trading Algorítmico</h2>
+    <h2 class="section-title">Motor de Señales por Gradiente y Ruptura de Canal ±2σ</h2>
+    <div class="code-wrapper">
+      <div class="code-header">
+        <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
+        <span class="code-filename">test_final.ipynb — Algoritmo de Backtesting</span>
+      </div>
+      <pre class="code-block"><span class="cm"># Parámetros del simulador financiero</span>
+sensibilidad_gradiente = <span class="nm">0.01</span>    <span class="cm"># umbral mínimo de Δpred (filtro de ruido)</span>
+capital                = <span class="nm">100.0</span>   <span class="cm"># USD de capital inicial</span>
+apuesta_por_trade      = <span class="nm">10.0</span>    <span class="cm"># tamaño de posición fijo</span>
+payout                 = <span class="nm">0.82</span>    <span class="cm"># retorno: 82% del capital apostado</span>
+
+gradiente_pred = np.<span class="fn">gradient</span>(prediccion_central)  <span class="cm"># derivada numérica discreta</span>
+
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="nm">1</span>, <span class="fn">len</span>(fechas_forward) - <span class="nm">1</span>):
+    <span class="cm"># Trigger 1 — Gradiente: giro de tendencia</span>
+    giro_alcista = (gradiente_pred[i-<span class="nm">1</span>] &lt; -sensibilidad_gradiente <span class="kw">and</span>
+                    gradiente_pred[i]   &gt;  sensibilidad_gradiente)
+    giro_bajista = (gradiente_pred[i-<span class="nm">1</span>] &gt;  sensibilidad_gradiente <span class="kw">and</span>
+                    gradiente_pred[i]   &lt; -sensibilidad_gradiente)
+    <span class="cm"># Trigger 2 — Canal: ruptura de banda gaussiana (reversión a la media)</span>
+    rompe_inf = precios_ciegos[i] &lt; banda_inferior[i]   <span class="cm"># sobreventa → BUY</span>
+    rompe_sup = precios_ciegos[i] &gt; banda_superior[i]   <span class="cm"># sobrecompra → SELL</span>
+
+    precio_entrada    = precios_ciegos[i]
+    precio_expiracion = precios_ciegos[i+<span class="nm">1</span>]             <span class="cm"># resolución a 1 h</span>
+
+    <span class="kw">if</span> giro_alcista <span class="kw">or</span> rompe_inf:   <span class="cm"># señal de COMPRA</span>
+        <span class="kw">if</span> precio_expiracion &gt; precio_entrada:
+            capital += apuesta_por_trade * payout     <span class="cm"># +82%: WIN</span>
+        <span class="kw">else</span>:
+            capital -= apuesta_por_trade              <span class="cm"># -100%: LOSS</span>
+    <span class="kw">elif</span> giro_bajista <span class="kw">or</span> rompe_sup: <span class="cm"># señal de VENTA</span>
+        <span class="kw">if</span> precio_expiracion &lt; precio_entrada:
+            capital += apuesta_por_trade * payout     <span class="cm"># +82%: WIN</span>
+        <span class="kw">else</span>:
+            capital -= apuesta_por_trade              <span class="cm"># -100%: LOSS</span></pre>
+    </div>
+    <table class="result-table">
+      <thead><tr><th>Parámetro</th><th>Valor</th><th>Descripción detallada</th></tr></thead>
+      <tbody>
+        <tr><td class="metric">Sensibilidad de Gradiente</td><td>0.01</td><td>Umbral mínimo del módulo del gradiente de la predicción para generar una señal; filtra micro-oscilaciones irrelevantes</td></tr>
+        <tr><td class="metric">Volumen por Trade</td><td>$10.00 USD</td><td>Tamaño de posición fijo; garantiza linealidad en la curva de capital y facilidad de interpretación estadística</td></tr>
+        <tr><td class="metric">Payout</td><td>82%</td><td>Retorno por operación ganada típico de brokers de opciones binarias; incluye comisión implícita del 18%</td></tr>
+        <tr><td class="metric">Expiración</td><td>1 hora (H1)</td><td>La operación se resuelve comparando el precio de entrada con el precio de cierre de la siguiente vela H1</td></tr>
+        <tr><td class="metric">Canal de Confianza</td><td>±2σ</td><td>Frontera gaussiana que cubre ≈95.4% de la distribución; cuando el precio la perfora, se asume agotamiento estadístico</td></tr>
+      </tbody>
+    </table>
+
+    <div class="figure-wrap" style="text-align:center; margin:20px 0;">
+      <img src="graficos/grafica_04_canal_predictivo.png" alt="Forward Testing y Canal Predictivo" style="max-width:100%; border:1px solid var(--rule); box-shadow:0 2px 8px rgba(0,0,0,.1);" />
+      <p style="font-size:13px; font-style:italic; color:var(--ink-3); margin-top:6px;"><strong>Fase 4 (Canal Predictivo ±2σ):</strong> En datos 100% ciegos (Forward Test), se acopla la base de Kalman con el pronóstico de la LSTM para predecir el camino central. El segundo cabezal de la red dictamina dinámicamente las bandas azules estocásticas.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 11 — RESULTADOS Y CONCLUSIONES
+══════════════════════════════════════════════════════ -->
+<section class="slide" id="slide-11">
+  <div class="slide-header">
+    <span>IX. Resultados, Conclusiones y Referencias</span>
+    <span class="slide-num">11 / 11</span>
+  </div>
+  <div class="paper">
+    <h2 class="section-num">IX. Resultados</h2>
+    <h2 class="section-title">Validación Forward-Test — Jun 15–19, 2026</h2>
+    <div class="metrics-grid">
+      <div class="metric-card good">
+        <div class="mc-label">Win Rate</div>
+        <div class="mc-value">83.3%</div>
+        <div class="mc-unit">5 de 6 operaciones</div>
+      </div>
+      <div class="metric-card good">
+        <div class="mc-label">Capital Final</div>
+        <div class="mc-value">$131</div>
+        <div class="mc-unit">+31% sobre $100 inicial</div>
+      </div>
+      <div class="metric-card">
+        <div class="mc-label">MAPE Test</div>
+        <div class="mc-value">0.014%</div>
+        <div class="mc-unit">Error porcentual absoluto</div>
+      </div>
+      <div class="metric-card">
+        <div class="mc-label">Trades ejecutados</div>
+        <div class="mc-value">6</div>
+        <div class="mc-unit">Semana Jun 15–19</div>
+      </div>
+    </div>
+
+    <h3>Equity Curve — Evolución del Capital</h3>
+    <table class="result-table">
+      <thead><tr><th>Trade</th><th>Fecha / Hora</th><th>Señal</th><th>Balance</th><th>Resultado</th></tr></thead>
+      <tbody>
+        <tr><td>Inicio</td><td>Jun 15, 00:00</td><td>—</td><td class="value-neutral">$100.00</td><td>—</td></tr>
+        <tr><td>#1</td><td>Jun 16, 11:00</td><td>VENTA (giro bajista)</td><td class="value-good">$108.20</td><td>✅ WIN +$8.20</td></tr>
+        <tr><td>#2</td><td>Jun 16, 13:00</td><td>COMPRA (giro alcista)</td><td class="value-neutral">$98.20</td><td>❌ LOSS −$10.00</td></tr>
+        <tr><td>#3</td><td>Jun 17, 22:00</td><td>COMPRA (rompe inf)</td><td class="value-good">$106.40</td><td>✅ WIN +$8.20</td></tr>
+        <tr><td>#4</td><td>Jun 18, 02:00</td><td>VENTA (rompe sup)</td><td class="value-good">$114.60</td><td>✅ WIN +$8.20</td></tr>
+        <tr><td>#5</td><td>Jun 18, 12:00</td><td>COMPRA (giro alcista)</td><td class="value-good">$122.80</td><td>✅ WIN +$8.20</td></tr>
+        <tr><td>#6</td><td>Jun 18, 19:00</td><td>VENTA (rompe sup)</td><td class="value-good">$131.00</td><td>✅ WIN +$8.20</td></tr>
+      </tbody>
+    </table>
+
+    <div class="figure-wrap" style="text-align:center; margin:20px 0;">
+      <img src="graficos/grafica_05_backtest_operativo.png" alt="Dashboard Operativo y Equity Curve" style="max-width:100%; border:1px solid var(--rule); box-shadow:0 2px 8px rgba(0,0,0,.1);" />
+      <p style="font-size:13px; font-style:italic; color:var(--ink-3); margin-top:6px;"><strong>Fase 5 (Validación y Resultados):</strong> Simulador operativo completo. Las rupturas del canal ±2σ o cambios bruscos en el gradiente disparan las señales (COMPRA/VENTA). El panel inferior audita el crecimiento puro del capital simulado.</p>
+    </div>
+
+    <hr class="rule" />
+    <h2 class="section-num">X. Conclusiones</h2>
+    <ul class="step-list">
+      <li>El filtro Kalman bidireccional Zero-Lag elimina el desfase temporal inherente al filtrado unidireccional, produciendo una estimación de tendencia sin anticipación de datos futuros.</li>
+      <li>La descomposición aditiva y el Explorador de Resonancia confirman matemáticamente el ciclo natural de 24 horas, justificando la ventana \(T=24\) de la LSTM.</li>
+      <li>La LSTM Dual-Head converge con MAPE 0.014% en datos de test ocultos, demostrando alta generalización. El cabezal ReLU de volatilidad construye el canal ±2σ de forma físicamente coherente.</li>
+      <li>El backtesting registra Win Rate 83.3% con +31% de retorno neto, validando la viabilidad del sistema en condiciones de forward-test completamente ciegas.</li>
+    </ul>
+
+    <hr class="rule" />
+    <h2 class="section-num">Referencias</h2>
+    <ol class="ref-list">
+      <li><span class="ref-num">[1]</span><span>R. E. Kalman, "A New Approach to Linear Filtering and Prediction Problems," <em>Trans. ASME J. Basic Eng.</em>, vol. 82, pp. 35–45, 1960.</span></li>
+      <li><span class="ref-num">[2]</span><span>S. Hochreiter &amp; J. Schmidhuber, "Long Short-Term Memory," <em>Neural Computation</em>, vol. 9, no. 8, pp. 1735–1780, 1997.</span></li>
+      <li><span class="ref-num">[3]</span><span>D. P. Kingma &amp; J. Ba, "Adam: A Method for Stochastic Optimization," <em>ICLR 2015</em>, arXiv:1412.6980, 2014.</span></li>
+      <li><span class="ref-num">[4]</span><span>R. J. Hyndman &amp; G. Athanasopoulos, <em>Forecasting: Principles and Practice</em>, 3rd ed., OTexts, 2021. — Descomposición aditiva STL.</span></li>
+      <li><span class="ref-num">[5]</span><span>S. K. Lam et al., "Numba: A LLVM-based Python JIT Compiler," <em>LLVM-HPC Workshop, SC'15</em>, 2015.</span></li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<div id="footer-nav">
+  <button class="nav-pill" id="btn-prev" onclick="changeSlide(-1)">◀ Anterior</button>
+  <span id="slide-indicator">Diapositiva 1 de 11</span>
+  <button class="nav-pill" id="btn-next" onclick="changeSlide(1)">Siguiente ▶</button>
+</div>
+
+<script>
+  const TOTAL = 11;
+  let current = 1;
+
+  function goToSlide(n) {
+    document.getElementById('slide-' + current).classList.remove('active');
+    current = Math.max(1, Math.min(TOTAL, n));
+    document.getElementById('slide-' + current).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    updateUI();
+  }
+  function changeSlide(dir) { goToSlide(current + dir); }
+
+  function updateUI() {
+    const pct = ((current - 1) / (TOTAL - 1)) * 100;
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('slide-counter').textContent = current + ' / ' + TOTAL;
+    document.getElementById('slide-indicator').textContent = 'Diapositiva ' + current + ' de ' + TOTAL;
+    document.getElementById('btn-prev').disabled   = current === 1;
+    document.getElementById('btn-next').disabled   = current === TOTAL;
+    document.getElementById('btn-prev-top').disabled = current === 1;
+    document.getElementById('btn-next-top').disabled = current === TOTAL;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') changeSlide(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   changeSlide(-1);
+  });
+
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; });
+  document.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 50) changeSlide(dx < 0 ? 1 : -1);
+  });
+
+  updateUI();
+</script>
+</body>
+</html>

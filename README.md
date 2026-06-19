@@ -1,5 +1,30 @@
-# Arquitectura y Dinámica Interna de la Red Neuronal Recurrente LSTM Híbrida de Salida Dual
-## Especificación de Hardware Lógico, Flujo de Señales y Ecuaciones Dinámicas de Control Multitarea
+# TAM PROJECT: Filtro de Kalman Adaptativo con LSTM Dual-Head para Trading Algorítmico (EUR/JPY)
+
+**Universidad Nacional de Colombia - sede Manizales**  
+**Departamento de Ingeniería Eléctrica, Electrónica, y Computación**  
+
+**Presentado por:**  
+- Santiago Alexander Zambrano Chicunque (Ingeniería Electrónica)  
+- Santiago Bustamante Montoya (Ingeniería Electrónica)  
+
+**Profesor:**  
+- Diego Armando Pérez Rosero, PhD.C  
+
+---
+
+## 📌 Visión General del Proyecto
+Este proyecto propone un sistema predictivo híbrido que elimina el ruido del precio mediante un **Filtro de Kalman Adaptativo Bidireccional (Zero-Lag)** y emplea una red neuronal **LSTM Dual-Head** para modelar la microestructura residual. El resultado es un canal predictivo estocástico ($\pm 2\sigma$) para el par EUR/JPY (temporalidad H1).
+
+### 📊 Presentación Académica (`index.html`)
+Se incluye una presentación interactiva detallada fase a fase (Descomposición Aditiva, Explorador de Resonancia Temporal, LSTM, Canal Predictivo y Backtest), con todo el código documentado.
+
+### 💻 Cuaderno de Investigación (`test_final.ipynb`)
+El simulador ha sido completamente portado a **Matplotlib** puro para generación de gráficos (`.png`), eliminando dependencias pesadas de Chromium/Kaleido, garantizando su correcta ejecución y exportación directa desde **Google Colab**.
+
+---
+
+## Arquitectura y Dinámica Interna de la Red Neuronal Recurrente LSTM Híbrida de Salida Dual
+### Especificación de Hardware Lógico, Flujo de Señales y Ecuaciones Dinámicas de Control Multitarea
 
 Este documento detalla la arquitectura de la red neuronal **LSTM (Long Short-Term Memory) de Salida Dual** implementada para el par de Forex **EUR/JPY** en temporalidad **H1**. El sistema se describe desde la perspectiva del modelado de sistemas de control, procesamiento de señales y dinámica de redes neuronales recurrentes (RNN).
 
