@@ -637,7 +637,7 @@ df_raw.<span class="fn">to_csv</span>(<span class="st">"EURJPY_D1_ultimo_ano.csv
     <div class="code-wrapper">
       <div class="code-header">
         <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
-        <span class="code-filename">test_final.ipynb — PASO 2: Motor JIT y Fase Cero</span>
+        <span class="code-filename">Feature.ipynb — PASO 2: Motor JIT y Fase Cero</span>
       </div>
       <pre class="code-block"><span class="kw">from</span> numba <span class="kw">import</span> njit
 
@@ -738,7 +738,7 @@ mejor_costo    = <span class="fn">float</span>(<span class="st">'inf'</span>)
     <div class="code-wrapper">
       <div class="code-header">
         <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
-        <span class="code-filename">test_final.ipynb — PASO 4: Descomposición Aditiva</span>
+        <span class="code-filename">Feature.ipynb — PASO 4: Descomposición Aditiva</span>
       </div>
       <pre class="code-block"><span class="kw">from</span> statsmodels.tsa.seasonal <span class="kw">import</span> seasonal_decompose
 
@@ -831,7 +831,7 @@ plt.<span class="fn">tight_layout</span>(); plt.<span class="fn">show</span>()</
     <div class="code-wrapper">
       <div class="code-header">
         <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
-        <span class="code-filename">test_final.ipynb — PASO 5: Explorador de Resonancia</span>
+        <span class="code-filename">Feature.ipynb — PASO 5: Explorador de Resonancia</span>
       </div>
       <pre class="code-block"><span class="cm"># Panel 1: Precio purificado por Kalman Zero-Lag</span>
 fig.<span class="fn">add_trace</span>(go.<span class="fn">Scatter</span>(x=indices, y=df_completo[<span class="st">'Kalman_ZeroLag'</span>],
@@ -893,7 +893,7 @@ fig.<span class="fn">add_trace</span>(go.<span class="fn">Scatter</span>(x=indic
     <div class="code-wrapper">
       <div class="code-header">
         <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
-        <span class="code-filename">test_final.ipynb — PASO 3: Feature Engineering</span>
+        <span class="code-filename">Feature.ipynb — PASO 3: Feature Engineering</span>
       </div>
       <pre class="code-block"><span class="cm"># Aplicar filtro campeón con parámetros óptimos hallados</span>
 senal_k_cero, historial_k = <span class="fn">aplicar_fase_cero</span>(
@@ -956,7 +956,7 @@ df_completo[<span class="st">'Volatilidad_Hibrida'</span>] = (
     <div class="code-wrapper">
       <div class="code-header">
         <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
-        <span class="code-filename">test_final.ipynb — PASO 3 AI: Pipeline de Producción LSTM</span>
+        <span class="code-filename">Models.ipynb — PASO 3 AI: Pipeline de Producción LSTM</span>
       </div>
       <pre class="code-block"><span class="cm"># ── Arquitectura LSTM Dual-Head ──────────────────────────────</span>
 T = <span class="nm">24</span>                                      <span class="cm"># ventana temporal (ciclo diario)</span>
@@ -979,9 +979,28 @@ model = <span class="fn">Model</span>(inputs=entrada_f, outputs=[res_f, std_f])
 model.<span class="fn">compile</span>(optimizer=<span class="fn">Adam</span>(<span class="nm">0.001</span>),
               loss={<span class="st">'Res'</span>: <span class="st">'mse'</span>, <span class="st">'Std'</span>: <span class="st">'mse'</span>},
               loss_weights={<span class="st">'Res'</span>: <span class="nm">1.0</span>, <span class="st">'Std'</span>: <span class="nm">0.3</span>})
-<span class="fn">EarlyStopping</span>(monitor=<span class="st">'val_loss'</span>, patience=<span class="nm">12</span>, restore_best_weights=<span class="nm">True</span>)
+early_stop_f = <span class="fn">EarlyStopping</span>(monitor=<span class="st">'val_loss'</span>, patience=<span class="nm">12</span>, restore_best_weights=<span class="nm">True</span>)
 
-<span class="cm"># ── Reconstrucción de la predicción final ────────────────────</span>
+<span class="cm"># ── Entrenamiento de Producción (Fit) ────────────────────────</span>
+history = model.<span class="fn">fit</span>(
+    X_all[:idx_fwd_arr], 
+    {<span class="st">'Res'</span>: y_res_all[:idx_fwd_arr], <span class="st">'Std'</span>: y_std_all[:idx_fwd_arr]},
+    validation_split=<span class="nm">0.15</span>, 
+    epochs=<span class="nm">60</span>, 
+    batch_size=<span class="nm">32</span>, 
+    callbacks=[early_stop_f], 
+    verbose=<span class="nm">1</span>
+)
+<span class="cm">/* Log de Entrenamiento:
+Epoch 1/60
+143/143 [==============================] - 5s 13ms/step - loss: 1.0506 - Res_loss: 0.7780 - Std_loss: 0.9086 - val_loss: 0.9320 - val_Res_loss: 0.6840 - val_Std_loss: 0.8267
+...
+Epoch 48/60
+143/143 [==============================] - 2s 14ms/step - loss: 0.4120 - Res_loss: 0.3012 - Std_loss: 0.3693 - val_loss: 0.5015 - val_Res_loss: 0.3702 - val_Std_loss: 0.4376
+*/</span>
+
+<span class="cm"># ── Inferencia y Reconstrucción de la predicción final ───────</span>
+p_res, p_std = model.<span class="fn">predict</span>(X_all[idx_fwd_arr:], verbose=<span class="nm">0</span>)
 prediccion_central = k_base + scaler_y_res.<span class="fn">inverse_transform</span>(p_res).<span class="fn">flatten</span>()
 pred_std           = scaler_y_std.<span class="fn">inverse_transform</span>(p_std).<span class="fn">flatten</span>()
 banda_superior     = prediccion_central + (<span class="nm">2</span> * pred_std)   <span class="cm"># +2σ</span>
@@ -1044,7 +1063,7 @@ banda_inferior     = prediccion_central - (<span class="nm">2</span> * pred_std)
     <div class="code-wrapper">
       <div class="code-header">
         <div class="code-dots"><span class="code-dot cd-red"></span><span class="code-dot cd-amber"></span><span class="code-dot cd-green"></span></div>
-        <span class="code-filename">test_final.ipynb — Algoritmo de Backtesting</span>
+        <span class="code-filename">Models.ipynb — Algoritmo de Backtesting</span>
       </div>
       <pre class="code-block"><span class="cm"># Parámetros del simulador financiero</span>
 sensibilidad_gradiente = <span class="nm">0.01</span>    <span class="cm"># umbral mínimo de Δpred (filtro de ruido)</span>
